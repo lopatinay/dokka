@@ -1,0 +1,24 @@
+[tool.poetry]
+name = "dokka"
+version = "0.1.0"
+description = ""
+authors = ["Oleksandr Lopatin <lopatin.alexander.y@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+flask = "^3.1.0"
+numpy = "^2.2.4"
+flask-sqlalchemy = "^3.1.1"
+geoalchemy2 = {extras = ["shapely"], version = "^0.17.1"}
+psycopg2-binary = "^2.9.10"
+celery = "^5.5.1"
+geopy = "^2.4.1"
+loguru = "^0.7.3"
+redis = "^5.2.1"
+gunicorn = "^23.0.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

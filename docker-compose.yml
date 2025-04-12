@@ -1,0 +1,75 @@
+version: '3.8'
+services:
+  db:
+    image: postgis/postgis:17-3.5
+    environment:
+      - POSTGRES_PASSWORD=pwd
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:latest
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    image: web
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: gunicorn -b 0.0.0.0:5000 app:app
+    environment:
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379}
+      RESULT_BACKEND: ${RESULT_BACKEND:-redis://redis:6379}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:pwd@db:5432/postgres}
+      SQLALCHEMY_TRACK_MODIFICATIONS: "False"
+      UPLOAD_FOLDER: "statics/uploads"
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    image: web
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: celery -A service_api.tasks.celery_app worker --loglevel=info -c 4
+    environment:
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379}
+      RESULT_BACKEND: ${RESULT_BACKEND:-redis://redis:6379}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:pwd@db:5432/postgres}
+      SQLALCHEMY_TRACK_MODIFICATIONS: "False"
+      UPLOAD_FOLDER: "statics/uploads"
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "celery", "-A", "service_api.tasks.celery_app", "inspect", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
