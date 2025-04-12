@@ -21,8 +21,8 @@ def make_celery():
 
     celery = Celery(
         app.import_name,
-        broker=app.config['CELERY_BROKER_URL'],
-        backend=app.config['RESULT_BACKEND']
+        broker=app.config["CELERY_BROKER_URL"],
+        backend=app.config["RESULT_BACKEND"],
     )
     celery.conf.update(app.config)
 
@@ -34,6 +34,7 @@ def make_celery():
 
     celery.Task = ContextTask
     return celery
+
 
 celery_app = make_celery()
 
@@ -49,9 +50,11 @@ def process_file_tasks(self):
     It also marks these tasks as 'running' to avoid duplicate processing.
     """
     try:
-        tasks_to_process = Task.query.filter(Task.status.in_([TaskStatus.pending, TaskStatus.failed])).all()
+        tasks_to_process = Task.query.filter(
+            Task.status.in_([TaskStatus.pending, TaskStatus.failed])
+        ).all()
         ran_tasks = set()
-        logger.info(f'Found {len(tasks_to_process)} tasks to process')
+        logger.info(f"Found {len(tasks_to_process)} tasks to process")
         for task_record in tasks_to_process:
             upload_uuid = str(task_record.upload_uuid)
             # Mark task as running
@@ -79,23 +82,27 @@ def process_upload(self, upload_uuid):
     generating distance combinations.
     """
     try:
-        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], f"{upload_uuid}.csv")
+        file_path = os.path.join(
+            current_app.config["UPLOAD_FOLDER"], f"{upload_uuid}.csv"
+        )
         points_to_insert = []
         BATCH_SIZE = 1000
 
         # Read CSV file row by row and accumulate points for bulk insertion.
-        with open(file_path, 'r') as csvfile:
+        with open(file_path, "r") as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
-                point_name = row['Point']
-                lat = float(row['Latitude'])
-                lon = float(row['Longitude'])
+                point_name = row["Point"]
+                lat = float(row["Latitude"])
+                lon = float(row["Longitude"])
                 # Store the geometry as WKT: "POINT(lon lat)" format.
-                points_to_insert.append({
-                    'name': point_name,
-                    'geom': f'POINT({lon} {lat})',
-                    'upload_uuid': upload_uuid
-                })
+                points_to_insert.append(
+                    {
+                        "name": point_name,
+                        "geom": f"POINT({lon} {lat})",
+                        "upload_uuid": upload_uuid,
+                    }
+                )
                 if len(points_to_insert) >= BATCH_SIZE:
                     db.session.bulk_insert_mappings(Point, points_to_insert)
                     db.session.commit()
@@ -112,7 +119,9 @@ def process_upload(self, upload_uuid):
 
     except Exception as e:
         # On failure, mark the Task status as failed.
-        Task.query.filter_by(upload_uuid=upload_uuid).update({"status": TaskStatus.failed})
+        Task.query.filter_by(upload_uuid=upload_uuid).update(
+            {"status": TaskStatus.failed}
+        )
         db.session.commit()
         self.retry(exc=e, countdown=10)
 
@@ -156,8 +165,9 @@ def calculate_distances(self, upload_uuid):
     # Paginate through the Distance records in batches.
     while True:
         batch = (
-            Distance.query
-            .filter(Distance.upload_uuid == upload_uuid, Distance.id > last_id)
+            Distance.query.filter(
+                Distance.upload_uuid == upload_uuid, Distance.id > last_id
+            )
             .order_by(Distance.id)
             .limit(batch_size)
             .all()
@@ -196,7 +206,7 @@ def calculate_distance_batch(self, batch_ids):
             geom_b = to_shape(rec.point_b)
             # Compute distance using haversine_np (inputs: lon, lat for each point).
             distance = haversine_np(geom_a.x, geom_a.y, geom_b.x, geom_b.y)
-            update_mappings.append({'id': rec.id, 'distance': distance})
+            update_mappings.append({"id": rec.id, "distance": distance})
         if update_mappings:
             session.bulk_update_mappings(Distance, update_mappings)
             session.commit()
@@ -245,13 +255,15 @@ def reverse_geocode_points(self, upload_uuid):
                 shapely_geom = to_shape(geom_val)  # Convert to Shapely geometry
                 # Call reverse_geocode sequentially using (latitude, longitude)
                 address = reverse_geocode(shapely_geom.y, shapely_geom.x)
-                update_mappings.append({'id': point_id, 'address': address})
+                update_mappings.append({"id": point_id, "address": address})
 
             if update_mappings:
                 session.bulk_update_mappings(Point, update_mappings)
                 session.commit()
 
-            last_id = batch[-1][0]  # Update the cursor with the last processed point's id
+            last_id = batch[-1][
+                0
+            ]  # Update the cursor with the last processed point's id
     except Exception as e:
         task_status = TaskStatus.failed
         raise

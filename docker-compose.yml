@@ -32,7 +32,6 @@ services:
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379}
       RESULT_BACKEND: ${RESULT_BACKEND:-redis://redis:6379}
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:pwd@db:5432/postgres}
-      SQLALCHEMY_TRACK_MODIFICATIONS: "False"
       UPLOAD_FOLDER: "statics/uploads"
     ports:
       - "5000:5000"

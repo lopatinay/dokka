@@ -10,10 +10,10 @@ from service_api.domain.get_result import get_result
 from service_api.models import Upload, db, Point
 from service_api.services.utils import allowed_file
 
-api = Blueprint('api', __name__, url_prefix='/api')
+api = Blueprint("api", __name__, url_prefix="/api")
 
 
-@api.route('/runtime-distance', methods=['POST'])
+@api.route("/runtime-distance", methods=["POST"])
 def calculate_distance_in_runtime():
     """
     POST /api/runtime-distance
@@ -39,11 +39,11 @@ def calculate_distance_in_runtime():
     """
 
     # Check that a file has been uploaded in the request
-    if 'file' not in request.files:
+    if "file" not in request.files:
         return jsonify({"error": "No file part in the request"}), 400
 
-    file = request.files['file']
-    if file.filename == '':
+    file = request.files["file"]
+    if file.filename == "":
         return jsonify({"error": "No file selected"}), 400
 
     if not allowed_file(file.filename):
@@ -51,7 +51,7 @@ def calculate_distance_in_runtime():
 
     # Generate a unique UUID for this upload and save the file to the UPLOAD_FOLDER
     upload_uuid = uuid4()
-    save_path = os.path.join(current_app.config['UPLOAD_FOLDER'], f"{upload_uuid}.csv")
+    save_path = os.path.join(current_app.config["UPLOAD_FOLDER"], f"{upload_uuid}.csv")
     file.save(save_path)
 
     # Create a new Upload record in the database
@@ -61,18 +61,20 @@ def calculate_distance_in_runtime():
 
     # Read the CSV file and prepare the data for bulk insertion into the Point table
     points_to_insert = []
-    with open(save_path, 'r') as csvfile:
+    with open(save_path, "r") as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
-            point_name = row['Point']
-            lat = float(row['Latitude'])
-            lon = float(row['Longitude'])
+            point_name = row["Point"]
+            lat = float(row["Latitude"])
+            lon = float(row["Longitude"])
             # Geometry is stored as WKT in the format: "POINT(lon lat)"
-            points_to_insert.append({
-                'name': point_name,
-                'geom': f'POINT({lon} {lat})',
-                'upload_uuid': str(upload_uuid)
-            })
+            points_to_insert.append(
+                {
+                    "name": point_name,
+                    "geom": f"POINT({lon} {lat})",
+                    "upload_uuid": str(upload_uuid),
+                }
+            )
 
     if points_to_insert:
         db.session.bulk_insert_mappings(Point, points_to_insert)
@@ -96,19 +98,13 @@ def calculate_distance_in_runtime():
     # Process the query results into a list of dictionaries
     combinations = []
     for row in result:
-        combinations.append({
-            "combination": row.combination,
-            "distance": row.distance
-        })
+        combinations.append({"combination": row.combination, "distance": row.distance})
 
     # Return a JSON response containing the upload_uuid and the generated combinations with distances.
-    return jsonify({
-        "upload_uuid": str(upload_uuid),
-        "combinations": combinations
-    }), 200
+    return jsonify({"upload_uuid": str(upload_uuid), "combinations": combinations}), 200
 
 
-@api.route('/calculateDistances', methods=['POST'])
+@api.route("/calculateDistances", methods=["POST"])
 def calculate_distance():
     """
     POST /api/calculateDistances
@@ -129,13 +125,13 @@ def calculate_distance():
     If the file is missing or invalid, it returns an error JSON response.
     """
     # Check if the file part exists in the request.
-    if 'file' not in request.files:
+    if "file" not in request.files:
         return jsonify({"error": "No file part in the request"}), 400
 
-    file = request.files['file']
+    file = request.files["file"]
 
     # Verify that a file was selected.
-    if file.filename == '':
+    if file.filename == "":
         return jsonify({"error": "No file selected"}), 400
 
     # Validate the file using the allowed_file function.
@@ -146,20 +142,23 @@ def calculate_distance():
 
         # Lazy import to avoid circular dependency issues.
         from service_api.tasks import process_file_tasks
+
         # Launch the processing task asynchronously.
         process_file_tasks.delay()
 
-        return jsonify({
-            "message": "File uploaded and tasks created successfully",
-            "upload_uuid": str(upload_uuid),
-            "task_status": "pending"
-        }), 200
+        return jsonify(
+            {
+                "message": "File uploaded and tasks created successfully",
+                "upload_uuid": str(upload_uuid),
+                "task_status": "pending",
+            }
+        ), 200
 
     # If the file is not allowed (i.e. the file type is invalid), return an error.
     return jsonify({"error": "Invalid file"}), 400
 
 
-@api.route('/getResult/<upload_uuid>', methods=['GET'])
+@api.route("/getResult/<upload_uuid>", methods=["GET"])
 def get_file_result(upload_uuid):
     """
     GET /api/getResult/<upload_uuid>
